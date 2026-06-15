@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>🍉 Fruit Ninja</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@700;900&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #fffdf7;
+    overflow: hidden;
+    font-family: 'Nunito', 'Georgia', serif;
+  }
+
+  #container {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+  }
+
+  /* Decorative pastel background blobs */
+  #bgCanvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  #webcam {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1);
+    opacity: 0.12;
+    filter: saturate(0.3) brightness(1.1);
+    z-index: 1;
+  }
+
+  #gameCanvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 2;
+  }
+
+  /* ── UI ── */
+  #ui {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 20px 32px;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  .score-box {
+    background: #fff;
+    border: 2.5px solid #f0e8d5;
+    border-radius: 22px;
+    padding: 10px 28px;
+    text-align: center;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.07);
+  }
+  .score-box .label {
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #b0a08a;
+    font-weight: 700;
+  }
+  .score-box .value {
+    font-size: 38px;
+    font-weight: 900;
+    color: #3a2e22;
+    line-height: 1.1;
+  }
+
+  #lives {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    background: #fff;
+    border: 2.5px solid #f0e8d5;
+    border-radius: 50px;
+    padding: 10px 20px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.07);
+  }
+  .flower { font-size: 28px; transition: transform 0.3s, filter 0.3s; }
+  .flower.lost { filter: grayscale(1) opacity(0.35) brightness(0.8); transform: scale(0.8) rotate(-20deg); }
+
+  /* ── Combo ── */
+  #combo {
+    position: absolute;
+    top: 42%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 64px;
+    font-weight: 900;
+    color: #ff5533;
+    text-shadow: 3px 3px 0 #ffddcc, 0 0 40px rgba(255,85,51,0.3);
+    pointer-events: none;
+    z-index: 15;
+    opacity: 0;
+    transition: opacity 0.35s;
+    white-space: nowrap;
+  }
+
+  /* ── Status ── */
+  #statusBar {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #fff;
+    border: 2px solid #f0e8d5;
+    border-radius: 30px;
+    padding: 7px 22px;
+    color: #b0a08a;
+    font-size: 13px;
+    font-weight: 700;
+    z-index: 10;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+
+  /* ── Overlay ── */
+  #overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 253, 247, 0.92);
+    backdrop-filter: blur(6px);
+    z-index: 20;
+    color: #3a2e22;
+    text-align: center;
+    gap: 16px;
+  }
+
+  #overlay .fruits-row {
+    font-size: 52px;
+    letter-spacing: 10px;
+    animation: float 2s ease-in-out infinite alternate;
+  }
+  @keyframes float {
+    from { transform: translateY(0); }
+    to   { transform: translateY(-10px); }
+  }
+
+  #overlay h1 {
+    font-size: 72px;
+    font-weight: 900;
+    color: #ff5533;
+    text-shadow: 4px 4px 0 #ffddcc;
+    line-height: 1;
+  }
+
+  #overlay p {
+    font-size: 17px;
+    color: #7a6a5a;
+    max-width: 400px;
+    line-height: 1.7;
+  }
+
+  #overlay .tagline {
+    font-size: 13px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #c0a880;
+    font-weight: 700;
+  }
+
+  #startBtn {
+    margin-top: 8px;
+    padding: 16px 52px;
+    font-size: 20px;
+    font-weight: 900;
+    font-family: inherit;
+    border: none;
+    border-radius: 50px;
+    background: linear-gradient(135deg, #ff7744, #ff3355);
+    color: #fff;
+    cursor: pointer;
+    box-shadow: 0 6px 0 #cc2233, 0 10px 30px rgba(255,60,60,0.3);
+    transition: transform 0.1s, box-shadow 0.1s;
+    letter-spacing: 1px;
+  }
+  #startBtn:hover { transform: translateY(-2px); box-shadow: 0 8px 0 #cc2233, 0 14px 36px rgba(255,60,60,0.35); }
+  #startBtn:active { transform: translateY(3px); box-shadow: 0 3px 0 #cc2233, 0 6px 20px rgba(255,60,60,0.25); }
+
+  /* decorative dots */
+  .dot-row {
+    display: flex; gap: 8px; justify-content: center;
+  }
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+</style>
+</head>
+<body>
+<div id="container">
+  <canvas id="bgCanvas"></canvas>
+  <video id="webcam" autoplay playsinline muted></video>
+  <canvas id="gameCanvas"></canvas>
+
+  <div id="ui">
+    <div class="score-box">
+      <div class="label">Score</div>
+      <div class="value" id="scoreVal">0</div>
+    </div>
+    <div id="lives">
+      <span class="flower" id="h1">🌸</span>
+      <span class="flower" id="h2">🌸</span>
+      <span class="flower" id="h3">🌸</span>
+    </div>
+    <div class="score-box">
+      <div class="label">Best</div>
+      <div class="value" id="bestVal">0</div>
+    </div>
+  </div>
+
+  <div id="combo"></div>
+  <div id="statusBar">📷 Starting camera…</div>
+
+  <div id="overlay">
+    <div class="fruits-row">🍎 🍊 🍋 🍉 🍇</div>
+    <h1>Fruit Ninja</h1>
+    <p class="tagline">✦ Slice with your finger ✦</p>
+    <p>Point your <strong>index finger</strong> at the camera<br>and <strong>swipe fast</strong> through flying fruits!</p>
+    <div class="dot-row">
+      <div class="dot" style="background:#ff5533"></div>
+      <div class="dot" style="background:#ffaa22"></div>
+      <div class="dot" style="background:#44cc77"></div>
+      <div class="dot" style="background:#4488ff"></div>
+      <div class="dot" style="background:#aa44ff"></div>
+    </div>
+    <button id="startBtn">Start Slicing!</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+<script>
+// ── Canvas setup ──────────────────────────────────────────────────
+const bgCanvas  = document.getElementById('bgCanvas');
+const bgCtx     = bgCanvas.getContext('2d');
+const canvas    = document.getElementById('gameCanvas');
+const ctx       = canvas.getContext('2d');
+const webcam    = document.getElementById('webcam');
+const statusBar = document.getElementById('statusBar');
+const overlay   = document.getElementById('overlay');
+const startBtn  = document.getElementById('startBtn');
+const scoreEl   = document.getElementById('scoreVal');
+const bestEl    = document.getElementById('bestVal');
+const comboEl   = document.getElementById('combo');
+
+function resize() {
+  canvas.width  = bgCanvas.width  = window.innerWidth;
+  canvas.height = bgCanvas.height = window.innerHeight;
+  drawBackground();
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ── Pastel watercolor background ──────────────────────────────────
+function drawBackground() {
+  const w = bgCanvas.width, h = bgCanvas.height;
+  bgCtx.clearRect(0, 0, w, h);
+
+  // cream base
+  bgCtx.fillStyle = '#fffdf7';
+  bgCtx.fillRect(0, 0, w, h);
+
+  // soft pastel blobs
+  const blobs = [
+    { x: w*0.08, y: h*0.12, r: w*0.22, color: 'rgba(255,220,200,0.35)' },
+    { x: w*0.88, y: h*0.15, r: w*0.18, color: 'rgba(200,240,200,0.3)'  },
+    { x: w*0.5,  y: h*0.9,  r: w*0.25, color: 'rgba(200,220,255,0.28)' },
+    { x: w*0.15, y: h*0.75, r: w*0.15, color: 'rgba(255,240,180,0.3)'  },
+    { x: w*0.82, y: h*0.7,  r: w*0.17, color: 'rgba(255,200,230,0.3)'  },
+  ];
+  blobs.forEach(b => {
+    const g = bgCtx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r);
+    g.addColorStop(0, b.color);
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    bgCtx.beginPath();
+    bgCtx.arc(b.x, b.y, b.r, 0, Math.PI*2);
+    bgCtx.fillStyle = g;
+    bgCtx.fill();
+  });
+
+  // subtle grid dots
+  bgCtx.fillStyle = 'rgba(200,185,165,0.18)';
+  for (let x = 40; x < w; x += 48) {
+    for (let y = 40; y < h; y += 48) {
+      bgCtx.beginPath();
+      bgCtx.arc(x, y, 2, 0, Math.PI*2);
+      bgCtx.fill();
+    }
+  }
+}
+
+// ── Fruit definitions ─────────────────────────────────────────────
+const FRUITS = [
+  {
+    name:'Apple', stemColor:'#5d4037', leafColor:'#4caf50',
+    body:'#e53935', bodyDark:'#b71c1c', shine:'#ff8a80',
+    flesh:'#ffccbc', seed:'#3e2723',
+    draw(ctx,x,y,r,rot) { drawRoundFruit(ctx,x,y,r,rot,this); },
+  },
+  {
+    name:'Orange', stemColor:'#5d4037', leafColor:'#66bb6a',
+    body:'#fb8c00', bodyDark:'#e65100', shine:'#ffe082',
+    flesh:'#fff3e0', seed:'#4e342e',
+    draw(ctx,x,y,r,rot) { drawCitrusFruit(ctx,x,y,r,rot,this); },
+  },
+  {
+    name:'Lemon', stemColor:'#5d4037', leafColor:'#aed581',
+    body:'#fdd835', bodyDark:'#f9a825', shine:'#fff9c4',
+    flesh:'#fffde7', seed:'#827717',
+    draw(ctx,x,y,r,rot) { drawLemon(ctx,x,y,r,rot,this); },
+  },
+  {
+    name:'Watermelon', stemColor:'#33691e', leafColor:'#81c784',
+    body:'#388e3c', bodyDark:'#1b5e20', shine:'#a5d6a7',
+    flesh:'#ef5350', seed:'#1a1a1a',
+    draw(ctx,x,y,r,rot) { drawWatermelon(ctx,x,y,r,rot,this); },
+  },
+  {
+    name:'Grape', stemColor:'#6d4c41', leafColor:'#ce93d8',
+    body:'#7b1fa2', bodyDark:'#4a148c', shine:'#e1bee7',
+    flesh:'#ce93d8', seed:'#311b92',
+    draw(ctx,x,y,r,rot) { drawGrape(ctx,x,y,r,rot,this); },
+  },
+  {
+    name:'Peach', stemColor:'#6d4c41', leafColor:'#a5d6a7',
+    body:'#ff8a65', bodyDark:'#bf360c', shine:'#ffccbc',
+    flesh:'#fff9c4', seed:'#5d4037',
+    draw(ctx,x,y,r,rot) { drawPeach(ctx,x,y,r,rot,this); },
+  },
+  {
+    name:'Kiwi', stemColor:'#4e342e', leafColor:'#8d6e63',
+    body:'#558b2f', bodyDark:'#33691e', shine:'#dcedc8',
+    flesh:'#8bc34a', seed:'#1b1b1b',
+    draw(ctx,x,y,r,rot) { drawKiwi(ctx,x,y,r,rot,this); },
+  },
+];
+
+// ── Illustrative fruit drawers ────────────────────────────────────
+function fruitGrad(ctx, x, y, r, f) {
+  const g = ctx.createRadialGradient(x - r*0.3, y - r*0.3, r*0.05, x, y, r);
+  g.addColorStop(0, f.shine);
+  g.addColorStop(0.45, f.body);
+  g.addColorStop(1, f.bodyDark);
+  return g;
+}
+function drawStem(ctx, x, y, r, f) {
+  ctx.beginPath();
+  ctx.moveTo(x, y - r);
+  ctx.quadraticCurveTo(x + r*0.35, y - r*1.4, x + r*0.18, y - r*1.65);
+  ctx.strokeStyle = f.stemColor;
+  ctx.lineWidth = 2.5;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+  // leaf
+  ctx.beginPath();
+  ctx.moveTo(x + r*0.18, y - r*1.45);
+  ctx.quadraticCurveTo(x + r*0.8, y - r*1.6, x + r*0.55, y - r*1.15);
+  ctx.quadraticCurveTo(x + r*0.25, y - r*1.25, x + r*0.18, y - r*1.45);
+  ctx.fillStyle = f.leafColor;
+  ctx.fill();
+  // leaf vein
+  ctx.beginPath();
+  ctx.moveTo(x + r*0.18, y - r*1.45);
+  ctx.quadraticCurveTo(x + r*0.5, y - r*1.38, x + r*0.55, y - r*1.15);
+  ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+}
+function drawShine(ctx, x, y, r) {
+  ctx.beginPath();
+  ctx.ellipse(x - r*0.28, y - r*0.28, r*0.2, r*0.12, -0.6, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(x - r*0.14, y - r*0.42, r*0.08, r*0.05, -0.4, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.fill();
+}
+function fruitShadow(ctx, x, y, r) {
+  const g = ctx.createRadialGradient(x+5, y+8, r*0.2, x+5, y+8, r*0.9);
+  g.addColorStop(0, 'rgba(0,0,0,0.18)');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.beginPath();
+  ctx.ellipse(x+5, y+r*0.6, r*0.85, r*0.45, 0, 0, Math.PI*2);
+  ctx.fillStyle = g;
+  ctx.fill();
+}
+
+function drawRoundFruit(ctx, x, y, r, rot, f) {
+  ctx.save(); ctx.translate(x,y); ctx.rotate(rot);
+  fruitShadow(ctx, 0, 0, r);
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI*2);
+  ctx.fillStyle = fruitGrad(ctx, 0, 0, r, f);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.08)'; ctx.lineWidth = 1.5; ctx.stroke();
+  // texture lines
+  ctx.beginPath(); ctx.moveTo(-r*0.05, -r*0.9); ctx.quadraticCurveTo(-r*0.35, -r*0.1, -r*0.08, r*0.85);
+  ctx.strokeStyle = 'rgba(0,0,0,0.07)'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(r*0.05, -r*0.9); ctx.quadraticCurveTo(r*0.35, -r*0.1, r*0.08, r*0.85);
+  ctx.strokeStyle = 'rgba(0,0,0,0.06)'; ctx.lineWidth = 1; ctx.stroke();
+  drawShine(ctx, 0, 0, r);
+  ctx.restore();
+  ctx.save(); ctx.translate(x,y); ctx.rotate(rot);
+  drawStem(ctx, 0, 0, r, f);
+  ctx.restore();
+}
+
+function drawCitrusFruit(ctx, x, y, r, rot, f) {
+  ctx.save(); ctx.translate(x,y); ctx.rotate(rot);
+  fruitShadow(ctx, 0, 0, r);
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI*2);
+  ctx.fillStyle = fruitGrad(ctx, 0, 0, r, f); ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.08)'; ctx.lineWidth = 1.5; ctx.stroke();
+  // peel texture bumps
+  for (let i = 0; i < 8; i++) {
+    const a = (Math.PI*2/8)*i;
+    const bx = Math.cos(a)*r*0.65, by = Math.sin(a)*r*0.65;
+    ctx.beginPath(); ctx.arc(bx, by, r*0.08, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(0,0,0,0.06)'; ctx.fill();
+  }
+  drawShine(ctx, 0, 0, r);
+  ctx.restore();
+  ctx.save(); ctx.translate(x,y); ctx.rotate(rot);
+  drawStem(ctx, 0, 0, r, f);
+  ctx.restore();
+}
+
+function drawLemon(ctx, x, y, r, rot, f) {
+  ctx.save(); ctx.translate(x,y); ctx.rotate(rot);
+  fruitShadow(ctx, 0, 0, r);
+  ctx.beginPath();
+  ctx.moveTo(0, -r);
+  ctx.bezierCurveTo(r*1.1, -r, r*1.1, r, 0, r);
+  ctx.bezierCurveTo(-r*1.1, r, -r*1.1, -r, 0, -r);
+  ctx.fillStyle = fruitGrad(ctx, 0, 0, r, f); ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.07)'; ctx.lineWidth = 1.5; ctx.stroke();
+  // tip nub
+  ctx.beginPath(); ctx.arc(0, r*0.95, r*0.12, 0, Math.PI*2);
+  ctx.fillStyle = f.bodyDark; ctx.fill();
+  drawShine(ctx, 0, 0, r);
+  ctx.restore();
+  ctx.save(); ctx.translate(x,y); ctx.rotate(rot);
+  drawStem(ctx, 0, 0, r, f);
+  ctx.restore();
+}
+
+function drawWatermelon(ctx, x, y, r, rot, f) {
+  ctx.save(); ctx.translate(x,y); ctx.rotate(rot);
+  fruitShadow(ctx, 0, 0, r);
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI*2);
+  // green outer
+  const g = ctx.createRadialGradient(-r*0.2,-r*0.2,r*0.05,0,0,r);
+  g.addColorStop(0,'#a5d6a7'); g.addColorStop(0.5,'#388e3c'); g.addColorStop(1,'#1b5e20');
+  ctx.fillStyle = g; ctx.fill();
+  // stripes
+  for (let i = 0; i < 5; i++) {
+    const a = (Math.PI*2/5)*i;
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.arc(0,0,r,a,a+0.28);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fill();
+  }
+  ctx.strokeStyle = 'rgba(0,0,0,0.1)'; ctx.lineWidth = 1.5; ctx.stroke();
+  drawShine(ctx, 0, 0, r);
+  ctx.restore();
+  ctx.save(); ctx.translate(x,y); ctx.rotate(rot);
+  drawStem(ctx, 0, 0, r, f);
+  ctx.restore();
+}
+
+function drawGrape(ctx, x, y, r, rot, f) {
+  // bunch of grapes
+  ctx.save(); ctx.translate(x,y); ctx.rotate(rot);
+  const positions = [
+    [0,-r*0.55,r*0.45],[r*0.5,-r*0.2,r*0.45],[-r*0.5,-r*0.2,r*0.45],
+    [r*0.28,r*0.3,r*0.45],[-r*0.28,r*0.3,r*0.45],[0,r*0.75,r*0.4],
+  ];
+  positions.forEach(([gx,gy,gr]) => {
+    const gg = ctx.createRadialGradient(gx-gr*0.3,gy-gr*0.3,gr*0.05,gx,gy,gr);
+    gg.addColorStop(0,f.shine); gg.addColorStop(0.5,f.body); gg.addColorStop(1,f.bodyDark);
+    ctx.beginPath(); ctx.arc(gx, gy, gr, 0, Math.PI*2);
+    ctx.fillStyle = gg; ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.07)'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(gx-gr*0.25, gy-gr*0.25, gr*0.15, gr*0.09, -0.5, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fill();
+  });
+  drawStem(ctx, 0, -r*1.05, r*0.3, f);
+  ctx.restore();
+}
+
+function drawPeach(ctx, x, y, r, rot, f) {
+  ctx.save(); ctx.translate(x,y); ctx.rotate(rot);
+  fruitShadow(ctx, 0, 0, r);
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI*2);
+  const g = ctx.createRadialGradient(-r*0.2,-r*0.25,r*0.05,0,0,r);
+  g.addColorStop(0,'#ffccbc'); g.addColorStop(0.4,f.body); g.addColorStop(0.75,'#ef9a9a'); g.addColorStop(1,f.bodyDark);
+  ctx.fillStyle = g; ctx.fill();
+  // crease
+  ctx.beginPath(); ctx.moveTo(0,-r*0.9); ctx.quadraticCurveTo(r*0.08, 0, 0, r*0.85);
+  ctx.strokeStyle = 'rgba(191,54,12,0.25)'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.strokeStyle = 'rgba(0,0,0,0.06)'; ctx.lineWidth = 1.5; ctx.stroke();
+  drawShine(ctx, 0, 0, r);
+  ctx.restore();
+  ctx.save(); ctx.translate(x,y); ctx.rotate(rot);
+  drawStem(ctx, 0, 0, r, f);
+  ctx.restore();
+}
+
+function drawKiwi(ctx, x, y, r, rot, f) {
+  ctx.save(); ctx.translate(x,y); ctx.rotate(rot);
+  fruitShadow(ctx, 0, 0, r);
+  // fuzzy brown body
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI*2);
+  const g = ctx.createRadialGradient(-r*0.2,-r*0.2,r*0.05,0,0,r);
+  g.addColorStop(0,'#bcaaa4'); g.addColorStop(0.5,'#8d6e63'); g.addColorStop(1,'#4e342e');
+  ctx.fillStyle = g; ctx.fill();
+  // fuzz texture
+  for (let i = 0; i < 24; i++) {
+    const a = (Math.PI*2/24)*i;
+    const tx = Math.cos(a)*r*0.82, ty = Math.sin(a)*r*0.82;
+    ctx.beginPath(); ctx.moveTo(tx,ty);
+    ctx.lineTo(Math.cos(a)*r*0.98, Math.sin(a)*r*0.98);
+    ctx.strokeStyle = 'rgba(62,35,20,0.3)'; ctx.lineWidth = 1; ctx.stroke();
+  }
+  ctx.strokeStyle = 'rgba(0,0,0,0.1)'; ctx.lineWidth = 1.5; ctx.stroke();
+  drawShine(ctx, 0, 0, r);
+  ctx.restore();
+  ctx.save(); ctx.translate(x,y); ctx.rotate(rot);
+  drawStem(ctx, 0, 0, r, f);
+  ctx.restore();
+}
+
+// sliced half — illustrative inner flesh
+function drawSlicedHalf(ctx, x, y, r, f, side, rot, alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(x, y);
+  ctx.rotate(rot);
+
+  ctx.beginPath();
+  if (side === 'L') { ctx.arc(0,0,r,Math.PI/2,Math.PI*1.5); ctx.lineTo(0,-r); }
+  else              { ctx.arc(0,0,r,-Math.PI/2,Math.PI/2);  ctx.lineTo(0,r);  }
+  ctx.closePath();
+
+  // outer skin
+  const g1 = ctx.createRadialGradient(-r*0.2,-r*0.2,r*0.05,0,0,r);
+  g1.addColorStop(0,f.shine); g1.addColorStop(0.5,f.body); g1.addColorStop(1,f.bodyDark);
+  ctx.fillStyle = g1; ctx.fill();
+
+  // inner flesh ring
+  ctx.beginPath();
+  if (side === 'L') { ctx.arc(0,0,r*0.82,Math.PI/2,Math.PI*1.5); ctx.lineTo(0,-r*0.82); }
+  else              { ctx.arc(0,0,r*0.82,-Math.PI/2,Math.PI/2);  ctx.lineTo(0,r*0.82);  }
+  ctx.closePath();
+  ctx.fillStyle = f.flesh; ctx.fill();
+
+  // watermelon gets red inside with seeds
+  if (f.name === 'Watermelon') {
+    ctx.beginPath();
+    if (side === 'L') { ctx.arc(0,0,r*0.68,Math.PI/2,Math.PI*1.5); ctx.lineTo(0,-r*0.68); }
+    else              { ctx.arc(0,0,r*0.68,-Math.PI/2,Math.PI/2);  ctx.lineTo(0,r*0.68);  }
+    ctx.closePath();
+    ctx.fillStyle = '#ef5350'; ctx.fill();
+  }
+
+  // seeds
+  const seedsX = side === 'L' ? -r*0.28 : r*0.22;
+  for (let i = 0; i < 3; i++) {
+    const sy = -r*0.38 + i * r*0.36;
+    ctx.beginPath(); ctx.ellipse(seedsX, sy, 3, 5.5, 0.15, 0, Math.PI*2);
+    ctx.fillStyle = f.seed; ctx.fill();
+  }
+
+  // juice shine line
+  ctx.beginPath();
+  ctx.moveTo(0, side==='L'?-r*0.8:-r*0.8);
+  ctx.lineTo(0, side==='L'?r*0.8:r*0.8);
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1.5; ctx.stroke();
+
+  ctx.strokeStyle = 'rgba(0,0,0,0.1)'; ctx.lineWidth = 1; ctx.stroke();
+  ctx.restore();
+}
+
+// ── Helpers ───────────────────────────────────────────────────────
+function darken(hex,a){
+  let c=parseInt(hex.slice(1),16),r=((c>>16)&0xff)*(1-a),g=((c>>8)&0xff)*(1-a),b=(c&0xff)*(1-a);
+  return `rgb(${r|0},${g|0},${b|0})`;
+}
+function lighten(hex,a){
+  let c=parseInt(hex.slice(1),16),r=Math.min(255,((c>>16)&0xff)+255*a),g=Math.min(255,((c>>8)&0xff)+255*a),b=Math.min(255,(c&0xff)+255*a);
+  return `rgb(${r|0},${g|0},${b|0})`;
+}
+
+// ── Game state ────────────────────────────────────────────────────
+let score=0, best=parseInt(localStorage.getItem('fruitNinjaBest')||'0'), lives=3, gameRunning=false;
+let fruits=[], particles=[], popups=[], slashTrail=[];
+let fingerPos=null, prevFingerPos=null;
+let comboCount=0, comboTimer=null, lastSpawn=0;
+
+// ── Particles ─────────────────────────────────────────────────────
+function spawnParticles(x, y, f) {
+  for (let i = 0; i < 20; i++) {
+    const a = (Math.PI*2/20)*i + Math.random()*0.3;
+    const s = 2.5 + Math.random()*6;
+    particles.push({x, y, vx:Math.cos(a)*s, vy:Math.sin(a)*s-2.5,
+      r:3+Math.random()*5, color:Math.random()<0.5?f.body:f.shine, life:1, decay:0.025+Math.random()*0.025});
+  }
+  for (let i = 0; i < 10; i++) {
+    particles.push({x, y, vx:(Math.random()-0.5)*14, vy:-Math.random()*10-1,
+      r:7+Math.random()*9, color:f.body+'99', life:1, decay:0.035+Math.random()*0.03, blob:true});
+  }
+}
+
+// ── Score popups ──────────────────────────────────────────────────
+function scorePopup(x, y, text, color='#ff5533') {
+  popups.push({x, y, text, color, life:1, vy:-2.2});
+}
+
+// ── Slash trail ───────────────────────────────────────────────────
+function drawSlash() {
+  if (slashTrail.length < 2) return;
+  ctx.save();
+  for (let i = 1; i < slashTrail.length; i++) {
+    const t = i / slashTrail.length;
+    const p = slashTrail[i-1], q = slashTrail[i];
+    // colored ribbon
+    ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(q.x,q.y);
+    ctx.strokeStyle = `hsla(${200+t*60},80%,70%,${t*0.7})`;
+    ctx.lineWidth = t * 16; ctx.lineCap='round'; ctx.stroke();
+    // white core
+    ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(q.x,q.y);
+    ctx.strokeStyle = `rgba(255,255,255,${t*0.9})`;
+    ctx.lineWidth = t * 5; ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ── Spawn ─────────────────────────────────────────────────────────
+function spawnFruit() {
+  const type = FRUITS[Math.floor(Math.random()*FRUITS.length)];
+  const r = 28 + Math.random()*20;
+
+  // tier must be defined before it's used
+  const tier = Math.min(Math.floor(score / 80), 3);
+  const t = tier / 3;
+  const tierLabels = ['🌱 Easy','🌿 Medium','🔥 Fast','⚡ Blazing'];
+  statusBar.textContent = tierLabels[tier];
+
+  // tier0 → center 20%, tier3 → full 80% width
+  const spread  = 0.20 + t * 0.60;
+  const startX  = (canvas.width - canvas.width * spread) / 2;
+  const x       = startX + Math.random() * (canvas.width * spread);
+
+  // all tiers fly 85–95% of screen height
+  const targetH = canvas.height * (0.85 + Math.random() * 0.10);
+  const baseVy  = Math.sqrt(targetH * 2 * 0.33);
+  const baseVx  = 2 + t * 3;
+  fruits.push({
+    x, y:canvas.height+r+10,
+    vx:(Math.random()-0.5)*baseVx*2, vy:-baseVy,
+    r, type, rotation:0, rotSpeed:(Math.random()-0.5)*0.06,
+    sliced:false, slicedTimer:1,
+    lx:0, ly:0, rx:0, ry:0,
+    lvx:0, lvy:0, rvx:0, rvy:0,
+    lrot:0, rrot:0, missed:false,
+  });
+}
+
+// ── Slice check ───────────────────────────────────────────────────
+function checkSlice(fr) {
+  if (fr.sliced || !fingerPos || !prevFingerPos) return;
+  const dx=fingerPos.x-prevFingerPos.x, dy=fingerPos.y-prevFingerPos.y;
+  const fx=fr.x-prevFingerPos.x,       fy=fr.y-prevFingerPos.y;
+  const len2=dx*dx+dy*dy; if(!len2) return;
+  let t=Math.max(0,Math.min(1,(fx*dx+fy*dy)/len2));
+  const cx=prevFingerPos.x+t*dx-fr.x, cy=prevFingerPos.y+t*dy-fr.y;
+  if (cx*cx+cy*cy < fr.r*fr.r) sliceFruit(fr);
+}
+
+function sliceFruit(fr) {
+  fr.sliced = true;
+  fr.slicedTimer = 1;
+  fr.lx=fr.x; fr.ly=fr.y; fr.rx=fr.x; fr.ry=fr.y;
+  fr.lvx=-3-Math.random()*2; fr.lvy=-2;
+  fr.rvx= 3+Math.random()*2; fr.rvy=-2;
+  fr.lrot=fr.rotation; fr.rrot=fr.rotation;
+  spawnParticles(fr.x, fr.y, fr.type);
+
+  score += 10;
+  scoreEl.textContent = score;
+  if (score > best) { best = score; bestEl.textContent = best; localStorage.setItem('fruitNinjaBest', best); }
+
+  comboCount++;
+  clearTimeout(comboTimer);
+  comboTimer = setTimeout(() => { comboCount=0; }, 1200);
+
+  if (comboCount >= 3) {
+    const bonus = comboCount * 5;
+    score += bonus; scoreEl.textContent = score;
+    showCombo(`${comboCount}✕ COMBO!`);
+    scorePopup(fr.x, fr.y-50, `+${10+bonus}`, '#ff5533');
+  } else {
+    scorePopup(fr.x, fr.y-40, '+10', '#44aa77');
+  }
+}
+
+function showCombo(txt) {
+  comboEl.textContent = txt;
+  comboEl.style.opacity = '1';
+  setTimeout(() => { comboEl.style.opacity='0'; }, 950);
+}
+
+// ── Hearts ────────────────────────────────────────────────────────
+function updateHearts() {
+  ['h1','h2','h3'].forEach((id,i) => {
+    const el = document.getElementById(id);
+    el.textContent = i < lives ? '🌸' : '🥀';
+    el.className = 'flower' + (i >= lives ? ' lost' : '');
+  });
+}
+
+// ── Main loop ─────────────────────────────────────────────────────
+function gameLoop(ts) {
+  if (!gameRunning) return;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // spawn
+  const interval = Math.max(700, 1600 - score*2);
+  if (ts - lastSpawn > interval) {
+    spawnFruit();
+    if (score > 60 && Math.random()<0.45) spawnFruit();
+    lastSpawn = ts;
+  }
+
+  // fruits
+  for (let i=fruits.length-1; i>=0; i--) {
+    const fr = fruits[i];
+    if (!fr.sliced) {
+      fr.vy += 0.33; fr.x += fr.vx; fr.y += fr.vy;
+      fr.rotation += fr.rotSpeed;
+      checkSlice(fr);
+      fr.type.draw(ctx, fr.x, fr.y, fr.r, fr.rotation);
+
+      if (fr.y > canvas.height+80 && !fr.missed) {
+        fr.missed = true;
+        lives--; updateHearts();
+        // miss splash
+        for (let j=0;j<6;j++) particles.push({
+          x:fr.x, y:canvas.height-20,
+          vx:(Math.random()-0.5)*8, vy:-Math.random()*5,
+          r:4+Math.random()*4, color:'#ffccaa', life:1, decay:0.05
+        });
+        if (lives<=0) { endGame(); return; }
+      }
+      if (fr.y > canvas.height+170) fruits.splice(i,1);
+    } else {
+      // halves
+      fr.slicedTimer -= 0.014;
+      fr.lvy += 0.4; fr.rvy += 0.4;
+      fr.lx += fr.lvx; fr.ly += fr.lvy;
+      fr.rx += fr.rvx; fr.ry += fr.rvy;
+      fr.lrot += 0.07; fr.rrot -= 0.07;
+      const a = Math.max(0, fr.slicedTimer);
+      drawSlicedHalf(ctx, fr.lx, fr.ly, fr.r, fr.type, 'L', fr.lrot, a);
+      drawSlicedHalf(ctx, fr.rx, fr.ry, fr.r, fr.type, 'R', fr.rrot, a);
+      if (fr.slicedTimer<=0 || fr.ly>canvas.height+120) fruits.splice(i,1);
+    }
+  }
+
+  // particles
+  for (let i=particles.length-1;i>=0;i--) {
+    const p=particles[i];
+    p.x+=p.vx; p.y+=p.vy; p.vy+=0.28; p.life-=p.decay;
+    if(p.life<=0){particles.splice(i,1);continue;}
+    ctx.save(); ctx.globalAlpha=p.life;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r*(p.blob?p.life:1),0,Math.PI*2);
+    ctx.fillStyle=p.color; ctx.fill(); ctx.restore();
+  }
+
+  // popups
+  for (let i=popups.length-1;i>=0;i--) {
+    const p=popups[i];
+    p.y+=p.vy; p.life-=0.022;
+    if(p.life<=0){popups.splice(i,1);continue;}
+    ctx.save(); ctx.globalAlpha=p.life;
+    ctx.font=`900 22px Nunito,Georgia`; ctx.textAlign='center';
+    ctx.shadowColor='rgba(255,255,255,0.9)'; ctx.shadowBlur=10;
+    ctx.fillStyle=p.color; ctx.fillText(p.text,p.x,p.y);
+    ctx.restore();
+  }
+
+  // finger cursor
+  if (fingerPos) {
+    ctx.save();
+    // outer ring
+    ctx.beginPath(); ctx.arc(fingerPos.x,fingerPos.y,18,0,Math.PI*2);
+    ctx.strokeStyle='rgba(255,85,51,0.5)'; ctx.lineWidth=2.5; ctx.stroke();
+    // inner dot
+    ctx.beginPath(); ctx.arc(fingerPos.x,fingerPos.y,6,0,Math.PI*2);
+    ctx.fillStyle='rgba(255,85,51,0.85)'; ctx.fill();
+    // glow
+    const grd=ctx.createRadialGradient(fingerPos.x,fingerPos.y,2,fingerPos.x,fingerPos.y,22);
+    grd.addColorStop(0,'rgba(255,120,80,0.3)'); grd.addColorStop(1,'rgba(255,120,80,0)');
+    ctx.beginPath(); ctx.arc(fingerPos.x,fingerPos.y,22,0,Math.PI*2);
+    ctx.fillStyle=grd; ctx.fill();
+    ctx.restore();
+  }
+
+  drawSlash();
+  requestAnimationFrame(gameLoop);
+}
+
+// ── Start / End ───────────────────────────────────────────────────
+function startGame() {
+  score=0; lives=3; gameRunning=true;
+  fruits=[]; particles=[]; popups=[]; slashTrail=[]; comboCount=0; lastSpawn=0;
+  scoreEl.textContent='0'; updateHearts();
+  overlay.style.display='none';
+  requestAnimationFrame(gameLoop);
+}
+
+function endGame() {
+  gameRunning=false;
+  overlay.style.display='flex';
+  overlay.innerHTML=`
+    <div class="fruits-row">🍎 🍊 🍋 🍉 🍇</div>
+    <h1>Game Over!</h1>
+    <p class="tagline">✦ Final Score ✦</p>
+    <p style="font-size:52px;font-weight:900;color:#ff5533;text-shadow:3px 3px 0 #ffddcc">${score}</p>
+    <p style="color:#b0a08a">Best: <strong>${best}</strong></p>
+    <button id="startBtn" onclick="startGame()"
+      style="margin-top:8px;padding:16px 52px;font-size:20px;font-weight:900;font-family:Nunito,inherit;
+             border:none;border-radius:50px;background:linear-gradient(135deg,#ff7744,#ff3355);
+             color:#fff;cursor:pointer;box-shadow:0 6px 0 #cc2233,0 10px 30px rgba(255,60,60,0.3)">
+      Play Again!
+    </button>
+  `;
+}
+
+startBtn.addEventListener('click', startGame);
+
+// ── MediaPipe ─────────────────────────────────────────────────────
+const hands = new Hands({ locateFile: f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
+hands.setOptions({ maxNumHands:1, modelComplexity:1, minDetectionConfidence:0.72, minTrackingConfidence:0.65 });
+hands.onResults(res => {
+  if (!gameRunning) return;
+  if (res.multiHandLandmarks && res.multiHandLandmarks.length>0) {
+    const tip = res.multiHandLandmarks[0][8];
+    const nx = (1-tip.x)*canvas.width;
+    const ny = tip.y*canvas.height;
+    prevFingerPos = fingerPos ? {...fingerPos} : null;
+    fingerPos = {x:nx, y:ny};
+    slashTrail.push({x:nx,y:ny});
+    if (slashTrail.length>16) slashTrail.shift();
+  } else {
+    fingerPos=null; prevFingerPos=null;
+    if (slashTrail.length>0) slashTrail.shift();
+  }
+});
+
+// ── Camera ────────────────────────────────────────────────────────
+async function startCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:1280,height:720}});
+    webcam.srcObject = stream;
+    await new Promise(r => webcam.onloadedmetadata=r);
+    webcam.play();
+    statusBar.textContent='✅ Camera ready — press Start!';
+    const cam = new Camera(webcam, {
+      onFrame: async () => { await hands.send({image:webcam}); },
+      width:1280, height:720
+    });
+    cam.start();
+  } catch(e) {
+    statusBar.textContent='❌ Camera not available — check browser permissions';
+  }
+}
+bestEl.textContent = best;
+startCamera();
+</script>
+</body>
+</html>
