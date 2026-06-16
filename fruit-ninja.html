@@ -2,22 +2,29 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <title>🍉 Fruit Ninja</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@700;900&display=swap');
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
-  body {
+  html, body {
     background: #fffdf7;
     overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: none;
+    width: 100%; height: 100%;
+    height: 100dvh;
     font-family: 'Nunito', 'Georgia', serif;
+    position: fixed;
   }
 
   #container {
-    position: relative;
-    width: 100vw;
-    height: 100vh;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    height: 100dvh;
   }
 
   /* Decorative pastel background blobs */
@@ -25,6 +32,7 @@
     position: absolute;
     top: 0; left: 0;
     width: 100%; height: 100%;
+    height: 100dvh;
     pointer-events: none;
     z-index: 0;
   }
@@ -38,12 +46,14 @@
     opacity: 0.12;
     filter: saturate(0.3) brightness(1.1);
     z-index: 1;
+    display: none;
   }
 
   #gameCanvas {
     position: absolute;
     top: 0; left: 0;
     width: 100%; height: 100%;
+    height: 100dvh;
     z-index: 2;
   }
 
@@ -93,6 +103,19 @@
   }
   .flower { font-size: 28px; transition: transform 0.3s, filter 0.3s; }
   .flower.lost { filter: grayscale(1) opacity(0.35) brightness(0.8); transform: scale(0.8) rotate(-20deg); }
+
+  /* ── Mobile responsive ── */
+  @media (max-width: 480px) {
+    #ui { padding: 10px 10px; gap: 4px; }
+    .score-box { padding: 6px 12px; border-radius: 14px; }
+    .score-box .label { font-size: 8px; letter-spacing: 1px; }
+    .score-box .value { font-size: 22px; }
+    #lives { padding: 6px 10px; gap: 4px; }
+    .flower { font-size: 18px; }
+    #timerVal { font-size: 18px !important; }
+    #combo { font-size: 36px; }
+    #statusBar { font-size: 11px; padding: 5px 14px; bottom: 10px; }
+  }
 
   /* ── Combo ── */
   #combo {
@@ -283,12 +306,16 @@ const bestEl    = document.getElementById('bestVal');
 const comboEl   = document.getElementById('combo');
 
 function resize() {
-  canvas.width  = bgCanvas.width  = window.innerWidth;
-  canvas.height = bgCanvas.height = window.innerHeight;
+  const vv = window.visualViewport;
+  const w = vv ? Math.round(vv.width)  : window.innerWidth;
+  const h = vv ? Math.round(vv.height) : window.innerHeight;
+  canvas.width  = bgCanvas.width  = w;
+  canvas.height = bgCanvas.height = h;
   drawBackground();
 }
 resize();
 window.addEventListener('resize', resize);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', resize);
 
 // ── Pastel watercolor background ──────────────────────────────────
 function drawBackground() {
@@ -746,10 +773,12 @@ function setMode(m) {
   document.getElementById('btnCamera').style.cssText += m==='camera' ? active : inactive;
   if (m === 'mouse') {
     fingerPos = null; prevFingerPos = null; slashTrail = [];
+    webcam.style.display = 'none';
     statusBar.textContent = '🖱️ Move your mouse to slice — press Start!';
   }
   if (m === 'camera') {
     fingerPos = null; prevFingerPos = null; slashTrail = [];
+    webcam.style.display = 'block';
     startCamera(); // lazy-init only when chosen
   }
 }
@@ -759,7 +788,7 @@ let score=0, best=parseInt(localStorage.getItem('fruitNinjaBest')||'0'), lives=3
 let fruits=[], particles=[], popups=[], slashTrail=[];
 let fingerPos=null, prevFingerPos=null;
 let comboCount=0, comboTimer=null, lastSpawn=0;
-const GAME_DURATION = 90;
+const GAME_DURATION = 60;
 let timeLeft=GAME_DURATION, lastTick=0, lastCountdownBeep=-1;
 
 // ── Particles ─────────────────────────────────────────────────────
@@ -1162,9 +1191,11 @@ function handleTouch(e) {
   slashTrail.push({x:nx, y:ny});
   if (slashTrail.length > 8) slashTrail.shift();
 }
-canvas.addEventListener('touchstart', handleTouch, {passive:true});
-canvas.addEventListener('touchmove',  handleTouch, {passive:true});
+canvas.addEventListener('touchstart', handleTouch, {passive:false});
+canvas.addEventListener('touchmove',  e => { e.preventDefault(); handleTouch(e); }, {passive:false});
 canvas.addEventListener('touchend', () => { fingerPos=null; prevFingerPos=null; }, {passive:true});
+document.addEventListener('gesturestart', e => e.preventDefault(), {passive:false});
+document.addEventListener('gesturechange', e => e.preventDefault(), {passive:false});
 
 // ── Camera + MediaPipe (only when camera mode selected) ───────────
 let camStarted = false;
