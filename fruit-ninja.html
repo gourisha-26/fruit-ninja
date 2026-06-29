@@ -286,6 +286,10 @@
       </button>
     </div>
     <button id="startBtn">Start Slicing!</button>
+    <div style="margin-top:14px;display:flex;align-items:center;justify-content:center;gap:8px">
+      <span style="font-size:13px;color:#aaa;font-weight:700;letter-spacing:0.04em">🎮 Players visited:</span>
+      <img src="https://hits.sh/gourisha-26.github.io/fruit-ninja.html.svg?style=flat-square&color=ff5533&labelColor=ffede8" alt="player count" style="height:20px;border-radius:6px;vertical-align:middle" />
+    </div>
   </div>
 </div>
 
@@ -1091,8 +1095,35 @@ function gameLoop(ts) {
 }
 
 // ── Start / End ───────────────────────────────────────────────────
+const COUNTER_URL = 'https://api.counterapi.dev/v1/fruit-ninja-gourisha/players';
+
+async function fetchPlayerCount() {
+  try {
+    const res = await fetch(COUNTER_URL);
+    const data = await res.json();
+    const el = document.getElementById('playerCount');
+    if (el && data.count != null) el.textContent = `🎮 ${data.count.toLocaleString()} players have played!`;
+    else if (el) el.textContent = '';
+  } catch(e) {
+    const el = document.getElementById('playerCount');
+    if (el) el.textContent = '';
+  }
+}
+
+async function incrementPlayerCount() {
+  try {
+    const res = await fetch(COUNTER_URL + '/up');
+    const data = await res.json();
+    const el = document.getElementById('playerCount');
+    if (el && data.count != null) el.textContent = `🎮 ${data.count.toLocaleString()} players have played!`;
+  } catch(e) {}
+}
+
+fetchPlayerCount();
+
 function startGame() {
   resumeAudio();
+  incrementPlayerCount();
   score=0; lives=3; gameRunning=true;
   fruits=[]; particles=[]; popups=[]; slashTrail=[]; comboCount=0; lastSpawn=0;
   prevFingerPos=null;
